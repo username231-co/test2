@@ -4,7 +4,7 @@ import folium
 from streamlit_folium import st_folium
 
 st.title("🗺️ 地図型思い出日記")
-st.caption("地図の中央にピンを立てて、その場所に思い出を記録しよう！")
+st.caption("地図の中央にピンを立てて、その場所に思い出を記録しよう！!!!")
 
 memo_title = st.text_input("思い出のタイトルを入力", "思い出の場所")
 memo = st.text_area("✏️ 思い出メモを書く", "")
