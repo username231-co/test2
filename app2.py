@@ -56,3 +56,38 @@ if st.button("✅ 登録"):
             cursor.close()
         if conn:
             conn.close()
+
+import pandas as pd
+
+# データベース接続（secrets.toml から取得）
+db_config = st.secrets["mysql"]
+
+try:
+    conn = mysql.connector.connect(
+        host=db_config["host"],
+        user=db_config["user"],
+        password=db_config["password"],
+        database=db_config["database"]
+    )
+    cursor = conn.cursor(dictionary=True)  # ← dict形式で取得するのがポイント！
+
+    # SQLで全件取得（新しい順）
+    cursor.execute("SELECT title, memo, latitude, longitude, created_at FROM memories ORDER BY created_at DESC")
+    results = cursor.fetchall()
+
+    # pandasで整形（表示しやすく）
+    if results:
+        df = pd.DataFrame(results)
+        st.markdown("### 📝 登録済みの思い出一覧")
+        st.dataframe(df)
+    else:
+        st.info("まだ登録された思い出はありません。")
+
+except mysql.connector.Error as e:
+    st.error(f"MySQLエラー（一覧取得）: {e}")
+
+finally:
+    if cursor:
+        cursor.close()
+    if conn:
+        conn.close()
