@@ -12,14 +12,14 @@ st.caption("地図をクリックして、その場所に思い出を記録し�
 memo_title = st.text_input("📌 思い出のタイトルを入力", "")
 memo = st.text_area("📝 思い出メモを書く", "")
 
-# 初期地図作成（福岡）
+# 初期マップ位置（福岡）
 initial_lat, initial_lng = 33.5902, 130.4017
 m = folium.Map(location=[initial_lat, initial_lng], zoom_start=12)
 
-# MySQL接続設定（secrets.tomlから読み込む）
+# --- MySQL 接続設定 ---
 db = st.secrets["mysql"]
 
-# --- 保存済みピンの取得＆表示 ---
+# --- 保存済みピンを取得＆地図に追加 ---
 try:
     conn = mysql.connector.connect(
         host=db["host"],
@@ -40,35 +40,36 @@ try:
         ).add_to(m)
 
 except mysql.connector.Error as e:
-    st.error(f"MySQLエラー（保存済みピンの取得）: {e}")
+    st.error(f"MySQLエラー（保存済みピン取得）: {e}")
 finally:
     if cursor: cursor.close()
     if conn: conn.close()
 
-# --- 地図表示（クリック取得用） ---
+# --- 地図クリックを取得（この段階ではまだ表示しない） ---
 map_data = st_folium(m, width=700, height=500, returned_objects=["last_clicked"])
 
-# --- ユーザーが地図をクリックした場合 ---
+# --- クリックされた位置に赤ピンを追加（保存済みピンと同じマップに） ---
 lat, lng = None, None
 if map_data and map_data["last_clicked"]:
     lat = map_data["last_clicked"]["lat"]
     lng = map_data["last_clicked"]["lng"]
 
-    # 赤い登録用ピンをマップに追加（クリック後）
     folium.Marker(
         location=[lat, lng],
         popup="📍 登録予定の場所",
         icon=folium.Icon(color="red", icon="plus")
     ).add_to(m)
 
-    # 再度地図を表示（登録用ピンを反映）
-    map_data = st_folium(m, width=700, height=500)
+# ✅ マップはここで1回だけ表示（赤ピン付きも含めて）
+map_data = st_folium(m, width=700, height=500)
 
+# --- 座標情報を表示 ---
+if lat and lng:
     st.success(f"📍 選択された座標：緯度 {lat:.5f}, 経度 {lng:.5f}")
 else:
-    st.info("地図をクリックして、思い出を登録する場所を選んでください。")
+    st.info("地図をクリックして登録する場所を選んでください。")
 
-# --- 思い出登録処理 ---
+# --- 思い出を登録（座標が選ばれていれば） ---
 if lat and lng:
     if st.button("✅ この場所で思い出を登録"):
         try:
@@ -84,7 +85,7 @@ if lat and lng:
                 (memo_title, memo, lat, lng)
             )
             conn.commit()
-            st.success("🎉 思い出を登録しました！ページを再読み込みするとピンに反映されます。")
+            st.success("🎉 思い出を登録しました！ページを更新するとピンに反映されます。")
 
         except mysql.connector.Error as e:
             st.error(f"MySQLエラー（登録）: {e}")
