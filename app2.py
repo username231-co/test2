@@ -5,7 +5,6 @@ import folium
 from streamlit_folium import st_folium
 
 st.set_page_config(page_title="地図型思い出日記", layout="centered")
-
 st.title("🗺️ 地図型思い出日記")
 st.caption("地図をクリックして、その場所に思い出を記録しよう！")
 
@@ -13,11 +12,11 @@ st.caption("地図をクリックして、その場所に思い出を記録し�
 memo_title = st.text_input("📌 思い出のタイトルを入力", "")
 memo = st.text_area("📝 思い出メモを書く", "")
 
-# 初期位置（福岡）で地図生成
+# --- 初期位置で地図作成（福岡） ---
 initial_lat, initial_lng = 33.5902, 130.4017
 m = folium.Map(location=[initial_lat, initial_lng], zoom_start=12)
 
-# --- 保存済みピンをデータベースから読み込み ---
+# --- 保存済みピンを表示 ---
 try:
     db = st.secrets["mysql"]
     conn = mysql.connector.connect(
@@ -39,12 +38,12 @@ try:
         ).add_to(m)
 
 except mysql.connector.Error as e:
-    st.error(f"MySQLエラー（保存済みピンの表示）: {e}")
+    st.error(f"MySQLエラー（保存済みピン）: {e}")
 finally:
     if cursor: cursor.close()
     if conn: conn.close()
 
-# --- 地図クリックで緯度・経度を取得 & ピンを表示 ---
+# --- 地図クリックの反応（ここで登録ピンを表示） ---
 map_data = st_folium(m, width=700, height=500, returned_objects=["last_clicked"])
 
 lat, lng = None, None
@@ -52,20 +51,23 @@ if map_data and map_data["last_clicked"]:
     lat = map_data["last_clicked"]["lat"]
     lng = map_data["last_clicked"]["lng"]
 
-    # ユーザーがクリックした場所にピンを追加表示
-    m_clicked = folium.Map(location=[lat, lng], zoom_start=12)
+    # 💡 登録用ピンを同じマップに追加！
     folium.Marker(
         location=[lat, lng],
-        popup="ここに思い出を登録します📍",
-        icon=folium.Icon(color="red")
-    ).add_to(m_clicked)
-    st_folium(m_clicked, width=700, height=500)
+        popup="📍 登録予定の場所",
+        icon=folium.Icon(color="red", icon="plus")
+    ).add_to(m)
 
+    # 再度マップ描画（登録ピンも反映された状態で）
+    map_data = st_folium(m, width=700, height=500)
     st.success(f"📍 選択された座標：緯度 {lat:.5f}, 経度 {lng:.5f}")
-else:
-    st.info("📍 地図をクリックして、登録する場所を選んでください")
 
-# --- 思い出を登録 ---
+else:
+    # 初期描画（クリックされていないとき）
+    st_folium(m, width=700, height=500)
+    st.info("地図をクリックして思い出を登録する場所を選んでください。")
+
+# --- 登録処理（ピンが選ばれていれば） ---
 if lat and lng:
     if st.button("✅ この場所で思い出を登録"):
         try:
@@ -81,14 +83,15 @@ if lat and lng:
                 (memo_title, memo, lat, lng)
             )
             conn.commit()
-            st.success("🎉 思い出を登録しました！ページを再読み込みするとピンに反映されます。")
+            st.success("🎉 思い出を登録しました！")
+
         except mysql.connector.Error as e:
             st.error(f"MySQLエラー（登録）: {e}")
         finally:
             if cursor: cursor.close()
             if conn: conn.close()
 
-# --- 一覧表示 ---
+# --- 一覧表示セクション ---
 st.markdown("---")
 st.markdown("### 📖 登録済みの思い出一覧")
 
