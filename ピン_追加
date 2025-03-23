@@ -1,0 +1,73 @@
+import streamlit as st
+import folium
+from streamlit_folium import st_folium
+
+st.title("🗺️ 地図型思い出日記")
+st.caption("地図の中央にピンを立てて、その場所に思い出を記録しよう！")
+
+# メモのタイトルを入力できるようにする
+memo_title = st.text_input("思い出のタイトルを入力", "思い出の場所")
+
+# 初期位置（福岡）の地図を作成
+m = folium.Map(location=[35, 135], zoom_start=5)
+
+# ピンの位置を取得する関数
+def get_pin_position(map_data):
+    if map_data and 'last_clicked' in map_data:
+        position = map_data['last_clicked']
+        if position:
+            return position['lat'], position['lng']
+    return None
+
+# 以前の保存したピンデータを保持する
+if "saved_pins" not in st.session_state:
+    st.session_state.saved_pins = []
+
+# すでに保存されているピンを地図に追加
+for pin_data in st.session_state.saved_pins:
+    folium.Marker(
+        location=pin_data['position'],
+        popup=f"{pin_data['memo']}",
+        icon=folium.Icon(color="blue"),
+        draggable=False
+    ).add_to(m)
+
+# 初期のドラッグ可能なピン
+folium.Marker(
+    [35, 135],
+    popup=memo_title,
+    icon=folium.Icon(color="red"),
+    draggable=True
+).add_to(m)
+
+# 地図を表示
+map_data = st_folium(m, width=700, height=500)
+
+# メモを書くエリア
+memo = st.text_area("✏️ 思い出メモを書く", "")
+
+# メモを保存するボタン
+if st.button("✅ 登録"):
+    pin_position = get_pin_position(map_data)
+    if pin_position:
+        # 新しいピンを保存
+        new_pin = {"title": memo_title, "position": pin_position, "memo": memo}
+        st.session_state.saved_pins.append(new_pin)
+        
+        st.success(
+            f"思い出を保存しました！\nタイトル: {memo_title}\n場所: 緯度 {pin_position[0]}, 経度 {pin_position[1]}\nメモ: {memo}"
+        )
+
+        # 地図をリロードして更新されたピンを表示
+        st.rerun()
+    else:
+        st.warning("ピンの位置を取得できませんでした。もう一度試してください。")
+
+# ピンを削除するためのセレクトボックス
+delete_pin_title = st.selectbox("削除するピンを選択", [pin['title'] for pin in st.session_state.saved_pins])
+
+# ピンを削除するボタン
+if st.button("❌ 削除"):
+    st.session_state.saved_pins = [pin for pin in st.session_state.saved_pins if pin['title'] != delete_pin_title]
+    st.success(f"ピン '{delete_pin_title}' を削除しました。")
+    st.rerun()
