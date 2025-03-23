@@ -12,13 +12,15 @@ st.caption("地図をクリックして、その場所に思い出を記録し�
 memo_title = st.text_input("📌 思い出のタイトルを入力", "")
 memo = st.text_area("📝 思い出メモを書く", "")
 
-# --- 初期位置で地図作成（福岡） ---
+# 初期地図作成（福岡）
 initial_lat, initial_lng = 33.5902, 130.4017
 m = folium.Map(location=[initial_lat, initial_lng], zoom_start=12)
 
-# --- 保存済みピンを表示 ---
+# MySQL接続設定（secrets.tomlから読み込む）
+db = st.secrets["mysql"]
+
+# --- 保存済みピンの取得＆表示 ---
 try:
-    db = st.secrets["mysql"]
     conn = mysql.connector.connect(
         host=db["host"],
         user=db["user"],
@@ -38,36 +40,35 @@ try:
         ).add_to(m)
 
 except mysql.connector.Error as e:
-    st.error(f"MySQLエラー（保存済みピン）: {e}")
+    st.error(f"MySQLエラー（保存済みピンの取得）: {e}")
 finally:
     if cursor: cursor.close()
     if conn: conn.close()
 
-# --- 地図クリックの反応（ここで登録ピンを表示） ---
+# --- 地図表示（クリック取得用） ---
 map_data = st_folium(m, width=700, height=500, returned_objects=["last_clicked"])
 
+# --- ユーザーが地図をクリックした場合 ---
 lat, lng = None, None
 if map_data and map_data["last_clicked"]:
     lat = map_data["last_clicked"]["lat"]
     lng = map_data["last_clicked"]["lng"]
 
-    # 💡 登録用ピンを同じマップに追加！
+    # 赤い登録用ピンをマップに追加（クリック後）
     folium.Marker(
         location=[lat, lng],
         popup="📍 登録予定の場所",
         icon=folium.Icon(color="red", icon="plus")
     ).add_to(m)
 
-    # 再度マップ描画（登録ピンも反映された状態で）
+    # 再度地図を表示（登録用ピンを反映）
     map_data = st_folium(m, width=700, height=500)
+
     st.success(f"📍 選択された座標：緯度 {lat:.5f}, 経度 {lng:.5f}")
-
 else:
-    # 初期描画（クリックされていないとき）
-    st_folium(m, width=700, height=500)
-    st.info("地図をクリックして思い出を登録する場所を選んでください。")
+    st.info("地図をクリックして、思い出を登録する場所を選んでください。")
 
-# --- 登録処理（ピンが選ばれていれば） ---
+# --- 思い出登録処理 ---
 if lat and lng:
     if st.button("✅ この場所で思い出を登録"):
         try:
@@ -83,7 +84,7 @@ if lat and lng:
                 (memo_title, memo, lat, lng)
             )
             conn.commit()
-            st.success("🎉 思い出を登録しました！")
+            st.success("🎉 思い出を登録しました！ページを再読み込みするとピンに反映されます。")
 
         except mysql.connector.Error as e:
             st.error(f"MySQLエラー（登録）: {e}")
